@@ -2,8 +2,7 @@
 use serde::Deserialize;
 use std::{
     collections::HashMap,
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
 };
 
@@ -85,4 +84,3 @@ pub fn load_default_config() -> AppConfig {
 
     load_config(&path)
 }
-

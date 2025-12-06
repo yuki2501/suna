@@ -3,7 +3,7 @@ mod config;
 mod envexpand;
 
 use std::path::PathBuf;
-use std::process::{Command, exit};
+use std::process::{exit, Command};
 
 fn main() {
     let cfg = config::load_default_config();
@@ -15,12 +15,9 @@ fn main() {
 
     if let Some(hook) = cfg.hooks.get(profile_name) {
         if let Some(script) = &hook.pre_script {
-            Command::new("sh")
-                .arg(script)
-                .status()
-                .unwrap_or_else(|e| {
-                    panic!("failed to run pre_script {}: {e}", script.display());
-                });
+            Command::new("sh").arg(script).status().unwrap_or_else(|e| {
+                panic!("failed to run pre_script {}: {e}", script.display());
+            });
         }
     }
 
@@ -60,4 +57,3 @@ fn main() {
 
     exit(status.code().unwrap_or(1));
 }
-
