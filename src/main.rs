@@ -1,10 +1,24 @@
-// src/main.rs
 mod config;
 mod envexpand;
 
 use std::path::PathBuf;
 use std::process::{exit, Command};
 
+fn git_toplevel(cwd: &Path) -> Option<PathBuf> {
+    let out = Command::new("git")
+        .arg("rev-parse")
+        .arg("--show-toplevel")
+        .current_dir(cwd)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+
+    let s = String::from_utf8(out.stdout).ok()?;
+    let path = s.trim();
+    Some(PathBuf::from(path))
+}
 
 fn run_hook_script(script: &PathBuf, profile_name: &str, phase: &str, exit_code: Option<i32>) {
     let mut cmd = Command::new("sh");
@@ -33,6 +47,16 @@ fn run_hook_script(script: &PathBuf, profile_name: &str, phase: &str, exit_code:
 }
 
 fn main() {
+
+    let cwd = env::current_dir().unwrap_or_else(|e| {
+        panic!("failed to get current dir: {e}");
+    });
+
+    if git_toplevel(&cwd).is_none() {
+    // git管理下ではない場合
+        return;
+    }
+
     let cfg = config::load_default_config();
 
     let profile_name = &cfg.app.default_profile;
