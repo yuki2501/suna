@@ -21,6 +21,15 @@ fn git_toplevel(cwd: &Path) -> Option<PathBuf> {
     Some(PathBuf::from(path))
 }
 
+fn is_inside_suna() -> bool {
+    match std::env::var("SUNA") {
+        Ok(v) => v == "1",
+        Err(_) => false,
+    }
+}
+
+
+
 fn run_hook_script(script: &PathBuf, profile_name: &str, phase: &str, exit_code: Option<i32>) {
     let mut cmd = Command::new("sh");
     cmd.arg(script);
@@ -52,7 +61,9 @@ fn main() {
     let cwd = env::current_dir().unwrap_or_else(|e| {
         panic!("failed to get current dir: {e}");
     });
-
+    if is_inside_suna() {
+        return;
+    }
     if git_toplevel(&cwd).is_none() {
     // git管理下ではない場合
         return;
