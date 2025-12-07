@@ -1,8 +1,9 @@
 mod config;
 mod envexpand;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
+use std::env;
 
 fn git_toplevel(cwd: &Path) -> Option<PathBuf> {
     let out = Command::new("git")
