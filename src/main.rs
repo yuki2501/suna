@@ -5,6 +5,33 @@ mod envexpand;
 use std::path::PathBuf;
 use std::process::{exit, Command};
 
+
+fn run_hook_script(script: &PathBuf, profile_name: &str, phase: &str, exit_code: Option<i32>) {
+    let mut cmd = Command::new("sh");
+    cmd.arg(script);
+
+    cmd.env("SUNA_PROFILE", profile_name);
+    cmd.env("SUNA_PHASE", phase);
+    if let Some(code) = exit_code {
+        cmd.env("SUNA_EXIT_STATUS", code.to_string());
+    }
+
+    let status = cmd.status().unwrap_or_else(|e| {
+        panic!(
+            "failed to run {phase} script {}: {e}",
+            script.display()
+        );
+    });
+
+    if !status.success() {
+        eprintln!(
+            "warning: {phase} script {} exited with status {:?}",
+            script.display(),
+            status.code()
+        );
+    }
+}
+
 fn main() {
     let cfg = config::load_default_config();
 
@@ -12,6 +39,8 @@ fn main() {
     let profile = cfg.profiles.get(profile_name).unwrap_or_else(|| {
         panic!("profile not found: {profile_name}");
     });
+
+    let hooks = cfg.hooks.get(profile_name);
 
     if let Some(hook) = cfg.hooks.get(profile_name) {
         if let Some(script) = &hook.pre_script {
@@ -45,9 +74,13 @@ fn main() {
         cmd.arg("-D");
         cmd.arg(format!("{k}={expanded}"));
     }
+    
+    cmd.env("SUNA", "1");
+    cmd.env("SUNA_PROFILE", profile_name);
+    let shell = std::env::var("$SHELL").unwrap_or_else(|_| "zsh".into());
 
-    cmd.arg("zsh"); // 本当はここに実行したいコマンドを載せる
-
+    cmd.arg("--");
+    cmd.arg(shell);
     for (k, v) in &profile.env {
         cmd.env(k, v);
     }
@@ -55,5 +88,13 @@ fn main() {
         panic!("failed to execute sandbox-exec: {e}");
     });
 
-    exit(status.code().unwrap_or(1));
+    let code = status.code().unwrap_or(1);
+
+    if let Some(h) = hooks {
+        if let Some(script) = &h.post_script {
+            run_hook_script(script, profile_name, "post", Some(code));
+        }
+    }
+
+    exit(code);
 }

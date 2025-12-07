@@ -57,6 +57,7 @@ pub struct Profile {
 #[derive(Debug, Deserialize, Default)]
 pub struct Hook {
     pub pre_script: Option<PathBuf>,
+    pub post_script: Option<PathBuf>,
 }
 
 pub fn load_config(path: &Path) -> AppConfig {
