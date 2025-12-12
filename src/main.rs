@@ -1,9 +1,12 @@
 mod config;
 mod envexpand;
 
+extern crate getopts;
+use getopts::Options;
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 use std::env;
+
 
 fn git_toplevel(cwd: &Path) -> Option<PathBuf> {
     let out = Command::new("git")
@@ -57,10 +60,22 @@ fn run_hook_script(script: &PathBuf, profile_name: &str, phase: &str, exit_code:
 }
 
 fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+    let mut options_config = Options::new();
+    options_config.optopt("p","profile", "set profile","STRING");
+
+    let matched_options = match options_config.parse(&args) {
+        Ok(m) => m,
+        Err(e) => {
+            panic!("{e}");
+        }
+    };
+
 
     let cwd = env::current_dir().unwrap_or_else(|e| {
         panic!("failed to get current dir: {e}");
     });
+
     if is_inside_suna() {
         return;
     }
@@ -70,15 +85,23 @@ fn main() {
     }
 
     let cfg = config::load_default_config();
-
-    let profile_name = &cfg.app.default_profile;
-    let profile = cfg.profiles.get(profile_name).unwrap_or_else(|| {
+    let profile_name : String = match matched_options.opt_str("p") {
+        Some(name) => {
+            if cfg.profiles.contains_key(&name) {
+                name
+            } else {
+                panic!("profile not found: {}", name);
+            }
+        }
+        None => cfg.app.default_profile.clone(),
+    };
+    let profile = cfg.profiles.get(&profile_name).unwrap_or_else(|| {
         panic!("profile not found: {profile_name}");
     });
 
-    let hooks = cfg.hooks.get(profile_name);
+    let hooks = cfg.hooks.get(&profile_name);
 
-    if let Some(hook) = cfg.hooks.get(profile_name) {
+    if let Some(hook) = cfg.hooks.get(&profile_name) {
         if let Some(script) = &hook.pre_script {
             Command::new("sh").arg(script).status().unwrap_or_else(|e| {
                 panic!("failed to run pre_script {}: {e}", script.display());
@@ -110,9 +133,9 @@ fn main() {
         cmd.arg("-D");
         cmd.arg(format!("{k}={expanded}"));
     }
-    
+
     cmd.env("SUNA", "1");
-    cmd.env("SUNA_PROFILE", profile_name);
+    cmd.env("SUNA_PROFILE", &profile_name);
     let shell = std::env::var("$SHELL").unwrap_or_else(|_| "zsh".into());
 
     cmd.arg("--");
@@ -128,7 +151,7 @@ fn main() {
 
     if let Some(h) = hooks {
         if let Some(script) = &h.post_script {
-            run_hook_script(script, profile_name, "post", Some(code));
+            run_hook_script(script, &profile_name, "post", Some(code));
         }
     }
 
